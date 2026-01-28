@@ -19,7 +19,9 @@ from typing import Dict, List, Optional, Set, Tuple
 
 
 # Media file extensions to process
-MEDIA_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".bmp", ".tiff", ".gif", ".avif", ".jxl", ".jfif", ".raw", ".cr2", ".nef", ".orf", ".sr2", ".arw", ".dng", ".pef", ".raf", ".rw2", ".srw", ".3fr", ".erf", ".k25", ".kdc", ".mef", ".mos", ".mrw", ".nrw", ".srf", ".x3f", ".mp4", ".mov", ".mkv", ".avi", ".webm", ".3gp", ".m4v", ".mpg", ".mpeg", ".mts", ".m2ts", ".ts", ".flv", ".f4v", ".wmv", ".asf", ".rm", ".rmvb", ".vob", ".ogv", ".mxf", ".dv", ".divx", ".xvid"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".bmp", ".tiff", ".gif", ".avif", ".jxl", ".jfif", ".raw", ".cr2", ".nef", ".orf", ".sr2", ".arw", ".dng", ".pef", ".raf", ".rw2", ".srw", ".3fr", ".erf", ".k25", ".kdc", ".mef", ".mos", ".mrw", ".nrw", ".srf", ".x3f"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".3gp", ".m4v", ".mpg", ".mpeg", ".mts", ".m2ts", ".ts", ".flv", ".f4v", ".wmv", ".asf", ".rm", ".rmvb", ".vob", ".ogv", ".mxf", ".dv", ".divx", ".xvid"}
+MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 
 # JSON filename patterns (Google Takeout inconsistencies)
 JSON_PATTERNS = [
@@ -213,7 +215,7 @@ def build_exiftool_command(exiftool_path: str, media_file: Path, metadata: Dict,
 
 def apply_metadata(exiftool_path: str, media_file: Path, metadata: Dict, dry_run: bool, verbose: bool) -> bool:
     """Apply metadata to media file using exiftool."""
-    is_video = media_file.suffix.lower() in {".mp4", ".mov"}
+    is_video = media_file.suffix.lower() in VIDEO_EXTENSIONS
     cmd = build_exiftool_command(exiftool_path, media_file, metadata, is_video)
 
     if dry_run:
