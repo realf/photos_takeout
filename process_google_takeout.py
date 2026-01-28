@@ -418,8 +418,8 @@ def main():
     parser.add_argument(
         "source",
         nargs="?",
-        default="Google Photos",
-        help="Source directory containing media files (default: 'Google Photos')"
+        default="Takeout/Google Photos",
+        help="Source directory containing media files (default: 'Takeout/Google Photos')"
     )
     parser.add_argument(
         "-o", "--output",
