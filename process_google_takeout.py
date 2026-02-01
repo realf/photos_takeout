@@ -34,7 +34,6 @@ JSON_PATTERNS = [
 stats = {
     "total_files": 0,
     "processed": 0,
-    "skipped": 0,
     "with_json": 0,
     "without_json": 0,
     "metadata_success": 0,
@@ -270,7 +269,6 @@ def process_file(
     output_root: Path,
     dry_run: bool,
     verbose: bool,
-    skip_no_json: bool
 ) -> bool:
     """Process a single media file."""
 
@@ -295,12 +293,6 @@ def process_file(
 
         if verbose:
             print(f"  No JSON metadata found")
-
-        if skip_no_json:
-            if verbose:
-                print(f"  Skipping (--skip-no-json)")
-            stats["skipped"] += 1
-            return True
 
     # Create output directory
     if not dry_run:
@@ -394,8 +386,6 @@ def print_summary(dry_run: bool):
     print("=" * 60)
     print(f"Total files found: {stats['total_files']}")
     print(f"Files processed: {stats['processed']}")
-    if stats["skipped"]:
-        print(f"Files skipped (--skip-no-json): {stats['skipped']}")
     print(f"Files with JSON metadata: {stats['with_json']}")
     print(f"Files without JSON: {stats['without_json']}")
 
@@ -442,11 +432,6 @@ def main():
         "--verbose",
         action="store_true",
         help="Print detailed progress for each file"
-    )
-    parser.add_argument(
-        "--skip-no-json",
-        action="store_true",
-        help="Don't copy files that lack JSON metadata"
     )
     parser.add_argument(
         "--skip-disk-check",
@@ -510,7 +495,6 @@ def main():
             output_dir,
             args.dry_run,
             args.verbose,
-            args.skip_no_json
         )
 
     print(f"\n[{stats['total_files']}/{stats['total_files']} - 100.0%] Processing complete")
@@ -524,25 +508,10 @@ def main():
         # Verify all files processed
         success, missing = verify_output(source_dir, output_dir)
 
-        expected = stats['total_files'] - stats['skipped']
         print(f"Source: {stats['total_files']} media files")
-        if stats["skipped"]:
-            print(f"Skipped (--skip-no-json): {stats['skipped']}")
-            print(f"Expected in output: {expected}")
         print(f"Output: {stats['processed']} media files")
 
-        if stats["skipped"]:
-            # Filter out intentionally skipped files (those without JSON metadata)
-            genuinely_missing = {f for f in missing if find_json_for_media(source_dir / f)}
-            if not genuinely_missing:
-                print("✓ All non-skipped files accounted for")
-            else:
-                print(f"\n❌ ERROR: {len(genuinely_missing)} files not processed (excluding skipped)!")
-                for f in sorted(genuinely_missing)[:20]:
-                    print(f"  MISSING: {f}")
-                if len(genuinely_missing) > 20:
-                    print(f"  ... and {len(genuinely_missing) - 20} more files")
-        elif success:
+        if success:
             print("✓ All files accounted for")
         else:
             print(f"\n❌ ERROR: {len(missing)} files not processed!")
@@ -562,7 +531,7 @@ def main():
     print_summary(args.dry_run)
 
     # Exit with appropriate code
-    if stats["errors"] and stats["processed"] < stats["total_files"] - stats["skipped"]:
+    if stats["errors"] and stats["processed"] < stats["total_files"]:
         print("\n❌ FAILED: Some files were not processed")
         sys.exit(1)
     elif stats["errors"]:
