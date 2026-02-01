@@ -1,7 +1,7 @@
 #!/bin/sh
 
-shopt -s nullglob
-for file in *.zip; do 
+for file in *.zip; do
+    [ -e "$file" ] || continue
     echo "Processing $file..."
     ditto -x -k "$file" . && \
     python3 process_google_takeout.py && \
