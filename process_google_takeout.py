@@ -85,13 +85,18 @@ def get_directory_size(path: Path) -> int:
     return total
 
 
-def check_disk_space(source_dir: Path, safety_margin: float = 1.2) -> bool:
+def check_disk_space(source_dir: Path, output_dir: Path, safety_margin: float = 1.2) -> bool:
     """Verify sufficient disk space is available (source size * safety_margin)."""
     source_size = get_directory_size(source_dir)
     required_bytes = source_size * safety_margin
     required_gb = required_bytes / (1024 ** 3)
 
-    stat = os.statvfs(".")
+    # Check free space on the output directory's filesystem
+    check_path = output_dir
+    while not check_path.exists():
+        check_path = check_path.parent
+
+    stat = os.statvfs(str(check_path))
     available_gb = (stat.f_bavail * stat.f_frsize) / (1024 ** 3)
 
     if available_gb < required_gb:
@@ -253,9 +258,6 @@ def discover_media_files(source_dir: Path) -> List[Path]:
 
     for file_path in source_dir.rglob("*"):
         if file_path.is_file() and file_path.suffix.lower() in MEDIA_EXTENSIONS:
-            # Skip metadata.json files (album-level, not file-level)
-            if file_path.name == "metadata.json":
-                continue
             media_files.append(file_path)
 
     return sorted(media_files)
@@ -331,16 +333,16 @@ def process_file(
     return True
 
 
-def verify_output(source_root: Path, output_root: Path) -> Tuple[bool, List[str]]:
-    """Verify all source files were processed."""
-    if not output_root.exists():
-        return False, ["Output directory does not exist"]
-
+def verify_output(source_root: Path, output_root: Path) -> Tuple[bool, Set[Path]]:
+    """Verify all source files were processed. Returns (success, missing_relative_paths)."""
     # Get all source media files (relative paths)
     source_files = set()
     for file_path in discover_media_files(source_root):
         rel_path = file_path.relative_to(source_root)
         source_files.add(rel_path)
+
+    if not output_root.exists():
+        return False, source_files
 
     # Get all output media files (relative paths)
     output_files = set()
@@ -350,12 +352,7 @@ def verify_output(source_root: Path, output_root: Path) -> Tuple[bool, List[str]
 
     # Find missing files
     missing = source_files - output_files
-
-    if missing:
-        missing_list = [f"  MISSING: {f}" for f in sorted(missing)]
-        return False, missing_list
-
-    return True, []
+    return len(missing) == 0, missing
 
 
 def verify_sample_metadata(exiftool_path: str, output_root: Path, sample_count: int = 5) -> List[str]:
@@ -483,7 +480,7 @@ def main():
         print(f"ERROR: Source directory not found: {source_dir}")
         sys.exit(1)
 
-    if not args.dry_run and not args.skip_disk_check and not check_disk_space(source_dir):
+    if not args.dry_run and not args.skip_disk_check and not check_disk_space(source_dir, output_dir):
         sys.exit(1)
 
     # Discover files
@@ -535,22 +532,22 @@ def main():
         print(f"Output: {stats['processed']} media files")
 
         if stats["skipped"]:
-            # When files are intentionally skipped, missing files are expected
-            if stats["processed"] >= expected:
+            # Filter out intentionally skipped files (those without JSON metadata)
+            genuinely_missing = {f for f in missing if find_json_for_media(source_dir / f)}
+            if not genuinely_missing:
                 print("✓ All non-skipped files accounted for")
             else:
-                actual_missing = expected - stats["processed"]
-                print(f"\n❌ ERROR: {actual_missing} files not processed (excluding skipped)!")
-                for msg in missing[:20]:
-                    print(msg)
-                if len(missing) > 20:
-                    print(f"  ... and {len(missing) - 20} more files")
+                print(f"\n❌ ERROR: {len(genuinely_missing)} files not processed (excluding skipped)!")
+                for f in sorted(genuinely_missing)[:20]:
+                    print(f"  MISSING: {f}")
+                if len(genuinely_missing) > 20:
+                    print(f"  ... and {len(genuinely_missing) - 20} more files")
         elif success:
             print("✓ All files accounted for")
         else:
             print(f"\n❌ ERROR: {len(missing)} files not processed!")
-            for msg in missing[:20]:  # Show first 20
-                print(msg)
+            for f in sorted(missing)[:20]:
+                print(f"  MISSING: {f}")
             if len(missing) > 20:
                 print(f"  ... and {len(missing) - 20} more files")
 
